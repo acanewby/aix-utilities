@@ -1,0 +1,133 @@
+#!/bin/sh
+
+# ======================================
+# (c) 2018 Adrian Newby
+# ======================================
+
+
+# Check we are running as root
+if [ "`id -u`" -ne "0" ]; then
+	echo "This script must be run as root"
+	exit
+fi
+
+# Check we are running on AIX
+if [ "`uname`" != "AIX" ]; then
+	echo "This script is AIX-specific"
+	exit
+fi
+
+# Set up output file
+OUTFILE=`basename $0`.out >/dev/null
+rm -f $OUTFILE
+
+# Run the health check commands
+
+# Basic machine information
+echo "========================================" >> $OUTFILE
+echo "Basic server information for [`hostname`]" >> $OUTFILE
+echo "Generated: `date`" >> $OUTFILE
+echo "========================================" >> $OUTFILE
+echo "" >> $OUTFILE
+echo "---------------------- uname ----------------------" >> $OUTFILE
+echo `uname -a` >> $OUTFILE
+echo "---------------------- Model ----------------------" >> $OUTFILE
+lsattr -El sys0 | grep modelname >> $OUTFILE
+echo "---------------------- Memory and CPU ----------------------" >> $OUTFILE
+vmstat | grep System >> $OUTFILE
+echo "---------------------- Filesystem cache ----------------------" >> $OUTFILE
+vmo -a | grep maxclient >> $OUTFILE
+echo "---------------------- Asynchronous IO ----------------------" >> $OUTFILE
+lsattr -E -l aio0 >> $OUTFILE
+
+# Disk and volume information
+echo "" >> $OUTFILE
+echo "" >> $OUTFILE
+echo "========================================" >> $OUTFILE
+echo "Disk and volume information" >> $OUTFILE
+echo "========================================" >> $OUTFILE
+
+# Physical Volume detail and allocation
+echo "" >> $OUTFILE
+echo "" >> $OUTFILE
+echo "================== Volume Groups ===================================" >> $OUTFILE
+lsvg >> $OUTFILE
+echo "" >> $OUTFILE
+echo "---------------------- Volume Group Detail ------------------" >> $OUTFILE
+lsvg >> $OUTFILE
+for vg in `lsvg`; do 
+	echo "------ Volume Group $vg: Detail ---" >> $OUTFILE
+	lsvg $vg  >> $OUTFILE
+	echo "------ Volume Group $vg: Physical Volumes ---" >> $OUTFILE
+	lsvg -p $vg >> $OUTFILE
+	echo "------ Volume Group $vg: Logical Volumes ---" >> $OUTFILE
+	lsvg -l $vg >> $OUTFILE
+done
+
+# Physical Volume detail and allocation
+echo "" >> $OUTFILE
+echo "" >> $OUTFILE
+echo "================== Physical Volumes ===================================" >> $OUTFILE
+lspv >> $OUTFILE
+for pv in `lspv | awk '{print $1}'`; do
+	echo "--------- Physical Volume $pv: Detail ---------" >> $OUTFILE
+	lspv $pv >> $OUTFILE
+done
+
+# Logical Volume detail and allocation
+echo "" >> $OUTFILE
+echo "" >> $OUTFILE
+for vg in `lsvg`; do
+	for lv in `lsvg -l $vg | awk '{print $1}' | grep -v $vg | grep -v LV`; do
+		echo "" >> $OUTFILE
+		echo "====== Logical Volume $lv: Detail =====" >> $OUTFILE
+		lslv $lv >> $OUTFILE
+		echo "------ Logical Volume $lv: Physical Allocation and mount ---" >> $OUTFILE
+		lslv -l $lv >> $OUTFILE
+	done
+done
+
+# Memory usage of Oracle database instances, if running
+echo "" >> $OUTFILE
+echo "" >> $OUTFILE
+echo "========================================" >> $OUTFILE
+echo "Memory usage of Oracle DB instances" >> $OUTFILE
+echo "========================================" >> $OUTFILE
+for pid in `ps -ef | grep ora | awk '{ print $2 }'`; do 
+
+	THISID=$pid
+	REALPAGES=`svmon -Put $THISID | grep $THISID | awk '{print $3}'`
+	SWAPPAGES=`svmon -Put $THISID | grep $THISID | awk '{print $5}'`
+	echo "Instance ID: $THISID [ $REALPAGES 4K pages (real) :  $SWAPPAGES 4K pages (swapped) ]" >> $OUTFILE
+done
+
+# Contents of /etc/oratab, if installed
+echo "" >> $OUTFILE
+echo "" >> $OUTFILE
+echo "========================================" >> $OUTFILE
+echo "Contents of oratab" >> $OUTFILE
+echo "========================================" >> $OUTFILE
+cat /etc/oratab >> $OUTFILE
+
+# Swap
+echo "" >> $OUTFILE
+echo "" >> $OUTFILE
+echo "========================================" >> $OUTFILE
+echo "Swap" >> $OUTFILE
+echo "========================================" >> $OUTFILE
+lsps -a >> $OUTFILE
+
+# Filesystems
+echo "" >> $OUTFILE
+echo "" >> $OUTFILE
+echo "========================================" >> $OUTFILE
+echo "Filesystem information" >> $OUTFILE
+echo "========================================" >> $OUTFILE
+df -k >> $OUTFILE
+echo "" >> $OUTFILE
+cat /etc/filesystems >> $OUTFILE
+echo "" >> $OUTFILE
+
+
+
+echo "Done: Results in $OUTFILE"

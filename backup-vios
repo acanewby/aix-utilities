@@ -1,0 +1,49 @@
+#!/usr/bin/sh
+
+# ======================================
+# (c) 2018 Adrian Newby
+# ======================================
+
+# -------------------------------------------------
+# backup-vios
+#
+# A script to create a mksysb backup to a remote
+# NFS share
+# -------------------------------------------------
+
+NFS_SVR=netapp1.colo1.veros.com
+NFS_EXP=/vol/central_bk
+
+exec 2>&1
+exec 1>${0}.out
+
+# Unmount anything already mounted on our target mount point
+/usr/sbin/umount /mnt
+
+# Mount remote backup server
+/usr/sbin/mount ${NFS_SVR}:${NFS_EXP} /mnt
+
+echo "backupios started at `date`"
+
+# su to padmin and execute the backup to the NFS on nimrod
+su - padmin -c '
+        ioscli backupios -file /mnt/vios/`ioscli hostname` -mksysb
+'
+
+# If the file exists, then we are good
+if [ -f /mnt/vios/`hostname` ]; then
+        if [ $? -gt 0 ]; then
+                echo "Copy to remote backup server failed"
+        else
+                echo "backupios (mksysb) completed at `date`"
+        fi
+else
+        echo "backup file not found."
+fi
+
+# Move to timestamped archive
+mv /mnt/vios/`hostname` /mnt/vios/`hostname`--`date +%Y%m%d-%H%M%S`
+
+
+# Unmount remote backup server
+/usr/sbin/umount /mnt

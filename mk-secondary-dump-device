@@ -1,0 +1,11 @@
+#!/usr/bin/sh
+
+# ======================================
+# (c) 2018 Adrian Newby
+# ======================================
+
+NUMLPS=$1
+
+/usr/sbin/mklv -y'sec_dumplv' -t'sysdump' -L'sec_dumplv' rootvg ${NUMLPS} hdisk1
+
+/usr/bin/sysdumpdev -P -s /dev/sec_dumplv

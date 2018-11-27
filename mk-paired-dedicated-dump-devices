@@ -1,0 +1,19 @@
+#!/usr/bin/sh
+
+# ======================================
+# (c) 2018 Adrian Newby
+# ======================================
+
+NUMLPS=$1
+FIRST_DISK=$2
+SECOND_DISK=$3
+
+/usr/sbin/mklv -y'pri_dumplv' -t'sysdump' -L'pri_dumplv' rootvg ${NUMLPS} ${FIRST_DISK}
+/usr/sbin/mklv -y'sec_dumplv' -t'sysdump' -L'sec_dumplv' rootvg ${NUMLPS} ${SECOND_DISK}
+
+/usr/bin/sysdumpdev -P -s /dev/sec_dumplv
+/usr/bin/sysdumpdev -P -p /dev/pri_dumplv
+
+echo "Done"
+echo "----"
+/usr/bin/sysdumpdev -l
